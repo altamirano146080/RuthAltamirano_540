@@ -26,6 +26,12 @@ export async function getUser(req, res) {
     if (err.response?.status === 401) {
       return res.status(401).json({ error: "Unauthorized. Twitch access token is invalid or has expired." });
     }
+    
+    // Twitch devuelve 400 cuando el ID es inválido o el usuario no existe
+    if (err.response?.status === 400) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    
     console.error(err);
     return res.status(500).json({ error: "Internal server error." });
   }
