@@ -232,14 +232,10 @@ curl http://localhost:3000/analytics/streams
 
 - [ ] Validar que `first` sea un número positivo
 - [ ] Añadir validación de formato para cursor `after`
-- [ ] Rate limiting interno para proteger la API
-- [ ] Variables de entorno para configurar límites
-según especificación
-- Se devuelve un array simple, no un objeto wrapperAgregar paginación con cursor para obtener más de 20 streams (parámetros `first` y `after`)
-- [ ] Manejo de rate limits (429) con header `retry_after`
-- [ ] Rate limiting interno para proteger la API
-- [ ] Variables de entorno para configurar límites
-La implementación cumple con todas las especificaciones del reto técnico, priorizando la funcionalidad core según lo requerido
+- [ ] Implementar rate limiting interno para proteger la API
+- [ ] Permitir configuración de límites mediante variables de entorno
+- [ ] Implementar retry automático con backoff para errores 429 (actualmente se delega al cliente)
+- [ ] Mejorar documentación de paginación y parámetros para mayor claridad
 
 ## Nota sobre el archivo .env
 
