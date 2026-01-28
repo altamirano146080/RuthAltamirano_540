@@ -177,15 +177,40 @@ curl http://localhost:3000/analytics/streams
 
 ### Manejo de errores
 
-- Cada controlador captura errores específicos (401, 404, 429)
-- Los errores inesperados caen en el catch general (500)
-- Para 429 (rate limit), se devuelve el header `retry_after` de Twitch
-
-**Justificación:** Respuestas consistentes y predecibles)
+- Cada controlador captura errores específicos (401, 404)
 - Los errores inesperados caen en el catch general (500)
 - Mensajes de error exactos según especificación
 
-**Justificación:** Respuestas consistentes y predecibles al cliente
+**Justificación:** Respuestas consistentes y predecibles al cliente.
+
+### Validación de parámetros
+
+**Decisión:** No validar exhaustivamente `first` ni `after`
+
+**Justificación:** Twitch API valida internamente estos parámetros:
+- `first`: Twitch limita automáticamente valores fuera de rango (1-100)
+- `after`: Twitch valida el cursor y devuelve datos vacíos si es inválido
+- El servidor delega estas validaciones a Twitch para evitar lógica redundante
+
+**Resultado:** Código más limpio, confía en validaciones upstream de Twitch.
+
+### Rate Limits
+
+**Cómo funciona Twitch:**
+- Token-bucket algorithm: cada request consume puntos
+- Si se excede límite → HTTP 429
+- Headers útiles: `Ratelimit-Limit`, `Ratelimit-Remaining`, `Ratelimit-Reset`
+
+**Nuestra implementación:**
+- Propagamos el error 429 al cliente
+- El cliente implementa retry con backoff
+- No implementamos rate limiting interno (out of scope)
+- Los errores inesperados caen en el catch general (500)
+- Mensajes de error exactos según especificación
+
+## Trade-offs y consideraciones
+
+### Token en memoria vs Base de datos
 
 - **Token en memoria**: simple y rápido, se pierde al reiniciar el servidor
 - Persistencia en DB descartada por complejidad innecesaria
@@ -196,11 +221,8 @@ curl http://localhost:3000/analytics/streams
 
 ### Transformación de respuesta en `/streams`
 
-- Solo se devuelven `title` y `user_name` junto con `pagination`
-
-### Paginación básica
-
-- Soporte de `first` y `after` sin validación exhaustiva, Twitch valida internamente
+- Solo se devuelven `title` y `user_name` según especificación
+- Se devuelve un array simple, no un objeto wrapper
 
 ### Rate Limits delegados al cliente
 
