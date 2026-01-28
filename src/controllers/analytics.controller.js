@@ -34,41 +34,21 @@ export async function getUser(req, res) {
 
 /**
  * GET /analytics/streams
- * Soporta paginación con parámetros first y after
  */
 export async function getStreams(req, res) {
   try {
-    // Limitar first a máximo 100 según límites de Twitch
-    const first = Math.min(req.query.first || 20, 100);
-    const after = req.query.after || '';
-
-    const url = `https://api.twitch.tv/helix/streams?first=${first}${after ? `&after=${after}` : ''}`;
-    const data = await twitchGet(url);
+    const data = await twitchGet('https://api.twitch.tv/helix/streams');
 
     const streams = data.data.map(stream => ({
       title: stream.title,
       user_name: stream.user_name
     }));
 
-    // Devuelve también el cursor para la siguiente página
-    return res.status(200).json({
-      data: streams,
-      pagination: data.pagination || {}
-    });
+    return res.status(200).json(streams);
   } catch (err) {
     if (err.response?.status === 401) {
       return res.status(401).json({ error: "Unauthorized. Twitch access token is invalid or has expired." });
     }
-    
-    // Manejar rate limits de Twitch
-    if (err.response?.status === 429) {
-      const retryAfter = err.response.headers['ratelimit-reset'];
-      return res.status(429).json({ 
-        error: "Too many requests. Please try again later.",
-        retry_after: retryAfter 
-      });
-    }
-    
     console.error(err);
     return res.status(500).json({ error: "Internal server error." });
   }

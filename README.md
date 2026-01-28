@@ -116,39 +116,22 @@ curl http://localhost:3000/analytics/user?id=44322889
 
 ### 2. GET `/analytics/streams`
 
-Obtiene una lista de streams en vivo actualmente en Twitch, con soporte de paginación.
-
-**Parámetros opcionales:**
-- `first` (query): Número de streams a devolver por página (default 20, máximo 100)
-- `after` (query): Cursor para avanzar a la siguiente página
+Obtiene una lista de streams en vivo actualmente en Twitch.
 
 **Respuestas:**
 
-- **200 OK**: Lista de streams en vivo con paginación
+- **200 OK**: Lista de streams en vivo
 ```json
-{
-  "data": [
-    { "title": "Playing Overwatch 2", "user_name": "xQc" },
-    { "title": "World of Warcraft - Mythic+", "user_name": "Asmongold" }
-  ],
-  "pagination": {
-    "cursor": "eyJiI..."
-  }
-}
+[
+  { "title": "Playing Overwatch 2", "user_name": "xQc" },
+  { "title": "World of Warcraft - Mythic+", "user_name": "Asmongold" }
+]
 ```
 
 - **401 Unauthorized**: Token de Twitch inválido o expirado
 ```json
 {
   "error": "Unauthorized. Twitch access token is invalid or has expired."
-}
-```
-
-- **429 Too Many Requests**: Límite de peticiones excedido
-```json
-{
-  "error": "Too many requests. Please try again later.",
-  "retry_after": 1674927600
 }
 ```
 
@@ -161,11 +144,7 @@ Obtiene una lista de streams en vivo actualmente en Twitch, con soporte de pagin
 
 **Ejemplo de uso:**
 ```bash
-# Sin parámetros (20 streams por defecto)
 curl http://localhost:3000/analytics/streams
-
-# Con paginación y límite personalizado
-curl "http://localhost:3000/analytics/streams?first=40&after=eyJiI..."
 ```
 
 ## Decisiones técnicas
@@ -194,10 +173,6 @@ curl "http://localhost:3000/analytics/streams?first=40&after=eyJiI..."
 - Valida presencia del parámetro `id` (cualquier string válido, Twitch trata IDs como opacos)
 - Respuesta 400 inmediata si falta
 
-**Endpoint `/analytics/streams`:**
-- Limita automáticamente `first` a máximo 100 (límite de Twitch API)
-- Soporta cursor `after` para paginación
-
 **Justificación:** Reduce llamadas innecesarias y mejora experiencia del usuario.
 
 ### Manejo de errores
@@ -206,27 +181,11 @@ curl "http://localhost:3000/analytics/streams?first=40&after=eyJiI..."
 - Los errores inesperados caen en el catch general (500)
 - Para 429 (rate limit), se devuelve el header `retry_after` de Twitch
 
-**Justificación:** Respuestas consistentes y predecibles al cliente.
+**Justificación:** Respuestas consistentes y predecibles)
+- Los errores inesperados caen en el catch general (500)
+- Mensajes de error exactos según especificación
 
-### Paginación
-
-- Soporta parámetros `first` y `after`
-- Devuelve estructura `{ data: [...], pagination: { cursor: "..." } }`
-- Compatible con el sistema de paginación de Twitch
-
-**Justificación:** Permite obtener más resultados sin sobrecargar la respuesta inicial.
-
-### Rate Limits
-
-- Captura error 429 de Twitch
-- Devuelve el timestamp `retry_after` al cliente
-- El cliente es responsable de implementar retry con backoff
-
-**Justificación:** Mantiene la API simple y sin estado.
-
-## Trade-offs y consideraciones
-
-### Token en memoria vs Base de datos
+**Justificación:** Respuestas consistentes y predecibles al cliente
 
 - **Token en memoria**: simple y rápido, se pierde al reiniciar el servidor
 - Persistencia en DB descartada por complejidad innecesaria
@@ -253,9 +212,9 @@ curl "http://localhost:3000/analytics/streams?first=40&after=eyJiI..."
 - [ ] Añadir validación de formato para cursor `after`
 - [ ] Rate limiting interno para proteger la API
 - [ ] Variables de entorno para configurar límites
-
-## Notas finales
-
-**Tiempo de desarrollo:** ~7 horas
-
-Soporta paginación con cursor `after` y devuelve `retry_after` en caso de alcanzar rate limits de Twitch.
+según especificación
+- Se devuelve un array simple, no un objeto wrapperAgregar paginación con cursor para obtener más de 20 streams (parámetros `first` y `after`)
+- [ ] Manejo de rate limits (429) con header `retry_after`
+- [ ] Rate limiting interno para proteger la API
+- [ ] Variables de entorno para configurar límites
+La implementación cumple con todas las especificaciones del reto técnico, priorizando la funcionalidad core según lo requerido

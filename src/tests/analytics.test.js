@@ -31,25 +31,16 @@ describe('Analytics API', () => {
 
   describe('GET /analytics/streams', () => {
     
-    test('debería retornar 200 y lista de streams con paginación', async () => {
+    test('debería retornar 200 y lista de streams', async () => {
       const response = await request(app).get('/analytics/streams');
       
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('data');
-      expect(response.body).toHaveProperty('pagination');
-      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(Array.isArray(response.body)).toBe(true);
       
-      if (response.body.data.length > 0) {
-        expect(response.body.data[0]).toHaveProperty('title');
-        expect(response.body.data[0]).toHaveProperty('user_name');
+      if (response.body.length > 0) {
+        expect(response.body[0]).toHaveProperty('title');
+        expect(response.body[0]).toHaveProperty('user_name');
       }
-    }, 10000);
-
-    test('debería soportar el parámetro first', async () => {
-      const response = await request(app).get('/analytics/streams?first=5');
-      
-      expect(response.status).toBe(200);
-      expect(response.body.data.length).toBeLessThanOrEqual(5);
     }, 10000);
   });
 });
