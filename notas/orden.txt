@@ -1,3 +1,76 @@
-eestructura de carpetas creada 
+Usuario HTTP
+    ↓
+server.js (punto de entrada)
+    ↓
+app.js (configuración Express)
+    ↓
+Routes (definen los endpoints)
+    ↓
+Controllers (lógica de negocio)
+    ↓
+Services (comunicación externa)
 
-Implementar el flujo del token OAuth
+
+server.js ->
+Importa la configuración de Express desde app.js
+Arranca el servidor en el puerto 3000 (o el que definas en .env)
+Imprime un mensaje cuando está listo
+Analogía: Es como el interruptor principal que enciende todo el proyecto
+
+app.js ->
+express() → Crea la aplicación Express
+app.use(express.json()) → Permite recibir/enviar JSON
+app.use('/analytics', analyticsRoutes) → Monta las rutas bajo el prefijo /analytics
+Flujo: Cuando llega una petición a /analytics/user, Express la dirija a las rutas de analytics.
+
+Routes ->
+Define qué función se ejecuta en cada endpoint:
+GET /analytics/user → ejecuta getUser()
+GET /analytics/streams → ejecuta getStreams()
+Analogía: Es como un mapa de direcciones que dice "si alguien pide /user, llama a la función
+
+Controllers ->
+A) getUser() - Obtener información de un usuario
+
+Obtiene el ID: const userId = req.query.id;
+
+Si llama a /user?id=123, userId = "123"
+Valida que existe: Si no hay ID → error 400 (Bad Request)
+
+Pide datos a Twitch: await twitchGet(...)
+
+La palabra async/await significa "espera a que termine la petición a Twitch"
+Verifica la respuesta: ¿Twitch devolvió datos?
+
+Sí → devuelve 200 con los datos
+No → devuelve 404 (User not found)
+Captura errores:
+
+Si falla la autenticación (401) → error 401
+Si el ID es inválido (400 de Twitch) → convertimos a 404
+Cualquier otro error → 500 (Internal Server Error)
+
+B) getStreams() - Obtener streams en vivo
+Diferencia con getUser():
+
+No valida parámetros (no hay id)
+Usa map() para transformar los datos
+Twitch devuelve muchos campos
+Nosotros solo devolvemos {title, user_name}
+
+Services ->
+¿Por qué es importante?
+
+Primera llamada: Pide token a Twitch
+Llamadas siguientes: Reutiliza el mismo token (mientras sea válido)
+Cuando expira: Pide uno nuevo
+Variables globales: accessToken y tokenExpiresAt guardan el token en memoria (se pierden si reincias el servidor, pero se regeneran automáticamente).
+
+B) twitchGet() - Hacer peticiones autenticadas
+¿Qué es Bearer?
+
+Es el estándar OAuth2
+Bearer = "aquí va un token"
+Authorization: Bearer abc123xyz significa "autentícate con este token"
+
+

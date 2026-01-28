@@ -19,7 +19,7 @@ describe('Analytics API', () => {
       expect(response.body).toHaveProperty('id');
       expect(response.body).toHaveProperty('login');
       expect(response.body).toHaveProperty('display_name');
-    }, 10000); // timeout de 10s por la llamada a Twitch
+    }, 10000)
 
     test('debería retornar 404 si el usuario no existe', async () => {
       const response = await request(app).get('/analytics/user?id=999999999999');
@@ -31,16 +31,25 @@ describe('Analytics API', () => {
 
   describe('GET /analytics/streams', () => {
     
-    test('debería retornar 200 y lista de streams', async () => {
+    test('debería retornar 200 y lista de streams con paginación', async () => {
       const response = await request(app).get('/analytics/streams');
       
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('pagination');
+      expect(Array.isArray(response.body.data)).toBe(true);
       
-      if (response.body.length > 0) {
-        expect(response.body[0]).toHaveProperty('title');
-        expect(response.body[0]).toHaveProperty('user_name');
+      if (response.body.data.length > 0) {
+        expect(response.body.data[0]).toHaveProperty('title');
+        expect(response.body.data[0]).toHaveProperty('user_name');
       }
+    }, 10000);
+
+    test('debería soportar el parámetro first', async () => {
+      const response = await request(app).get('/analytics/streams?first=5');
+      
+      expect(response.status).toBe(200);
+      expect(response.body.data.length).toBeLessThanOrEqual(5);
     }, 10000);
   });
 });

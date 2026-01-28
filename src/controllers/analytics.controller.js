@@ -6,28 +6,23 @@ import { twitchGet } from '../services/twitch.service.js';
 export async function getUser(req, res) {
   const userId = req.query.id;
 
-  // 1. Validación del parámetro
   if (!userId) {
     return res.status(400).json({ error: "Invalid or missing 'id' parameter." });
   }
 
   try {
-    // 2. Consulta a la API de Twitch
     const data = await twitchGet(`https://api.twitch.tv/helix/users?id=${userId}`);
 
     if (!data || !data.data || data.data.length === 0) {
       return res.status(404).json({ error: "User not found." });
     }
 
-    // 3. Devolvemos la información del usuario
     return res.status(200).json(data.data[0]);
   } catch (err) {
-    // 4. Manejo de errores
     if (err.response?.status === 401) {
       return res.status(401).json({ error: "Unauthorized. Twitch access token is invalid or has expired." });
     }
     
-    // Twitch devuelve 400 cuando el ID es inválido o el usuario no existe
     if (err.response?.status === 400) {
       return res.status(404).json({ error: "User not found." });
     }
@@ -39,22 +34,41 @@ export async function getUser(req, res) {
 
 /**
  * GET /analytics/streams
+ * Soporta paginación con parámetros first y after
  */
 export async function getStreams(req, res) {
   try {
-    const data = await twitchGet('https://api.twitch.tv/helix/streams');
+    // Limitar first a máximo 100 según límites de Twitch
+    const first = Math.min(req.query.first || 20, 100);
+    const after = req.query.after || '';
 
-    // Transformamos para devolver solo los campos que pide la prueba
+    const url = `https://api.twitch.tv/helix/streams?first=${first}${after ? `&after=${after}` : ''}`;
+    const data = await twitchGet(url);
+
     const streams = data.data.map(stream => ({
       title: stream.title,
       user_name: stream.user_name
     }));
 
-    return res.status(200).json(streams);
+    // Devuelve también el cursor para la siguiente página
+    return res.status(200).json({
+      data: streams,
+      pagination: data.pagination || {}
+    });
   } catch (err) {
     if (err.response?.status === 401) {
       return res.status(401).json({ error: "Unauthorized. Twitch access token is invalid or has expired." });
     }
+    
+    // Manejar rate limits de Twitch
+    if (err.response?.status === 429) {
+      const retryAfter = err.response.headers['ratelimit-reset'];
+      return res.status(429).json({ 
+        error: "Too many requests. Please try again later.",
+        retry_after: retryAfter 
+      });
+    }
+    
     console.error(err);
     return res.status(500).json({ error: "Internal server error." });
   }

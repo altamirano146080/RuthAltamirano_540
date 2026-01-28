@@ -2,32 +2,32 @@
 
 API REST para consultar información de usuarios y streams en vivo de Twitch. Proyecto desarrollado como reto técnico para 540.
 
-## 📋 Tabla de contenidos
+## Tabla de contenidos
 
-- [Descripción](#-descripción)
-- [Requisitos previos](#-requisitos-previos)
-- [Instalación y ejecución](#-instalación-y-ejecución)
-- [Endpoints](#-endpoints)
-- [Decisiones técnicas](#-decisiones-técnicas)
-- [Trade-offs y consideraciones](#-trade-offs-y-consideraciones)
-- [Estructura del proyecto](#-estructura-del-proyecto)
-- [Posibles mejoras](#-posibles-mejoras)
+- [Descripción](#descripción)
+- [Requisitos previos](#requisitos-previos)
+- [Instalación y ejecución](#instalación-y-ejecución)
+- [Endpoints](#endpoints)
+- [Decisiones técnicas](#decisiones-técnicas)
+- [Trade-offs y consideraciones](#trade-offs-y-consideraciones)
+- [Posibles mejoras](#posibles-mejoras)
+- [Notas finales](#notas-finales)
 
-## 🎯 Descripción
+## Descripción
 
 Este proyecto implementa una API que interactúa con la API pública de Twitch para:
 - Consultar información de usuarios por ID
 - Listar streams en directo actualmente
 
-La API gestiona automáticamente la autenticación OAuth con Twitch y maneja errores según las especificaciones del reto.
+La API gestiona automáticamente la autenticación OAuth con Twitch, maneja errores según las especificaciones y soporta paginación y límites de rate limit.
 
-## 📦 Requisitos previos
+## Requisitos previos
 
 - **Node.js** v18 o superior
-- **npm** o **yarn**
+- **npm**
 - Credenciales de aplicación de Twitch (Client ID y Client Secret)
 
-## 🚀 Instalación y ejecución
+## Instalación y ejecución
 
 ### 1. Clonar el repositorio
 
@@ -68,34 +68,20 @@ Para desarrollo con hot-reload:
 npm run dev
 ```
 
-## 📡 Endpoints
+## Endpoints
 
 ### 1. GET `/analytics/user?id={id}`
 
 Obtiene información de un usuario de Twitch por su ID.
 
 **Parámetros:**
-- `id` (query, requerido): ID del usuario de Twitch
+- `id` (query, requerido): ID del usuario de Twitch (Twitch trata los IDs como opacos, cualquier string es válido).
 
 **Respuestas:**
 
 - **200 OK**: Información del usuario
-```json
-{
-  "id": "44322889",
-  "login": "dallas",
-  "display_name": "dallas",
-  "type": "staff",
-  "broadcaster_type": "",
-  "description": "Just a gamer playing games...",
-  "profile_image_url": "https://...",
-  "offline_image_url": "https://...",
-  "view_count": 191836881,
-  "created_at": "2013-06-03T19:12:02Z"
-}
-```
 
-- **400 Bad Request**: ID ausente o inválido
+- **400 Bad Request**: ID ausente
 ```json
 {
   "error": "Invalid or missing 'id' parameter."
@@ -130,28 +116,39 @@ curl http://localhost:3000/analytics/user?id=44322889
 
 ### 2. GET `/analytics/streams`
 
-Obtiene una lista de streams en vivo actualmente en Twitch.
+Obtiene una lista de streams en vivo actualmente en Twitch, con soporte de paginación.
+
+**Parámetros opcionales:**
+- `first` (query): Número de streams a devolver por página (default 20, máximo 100)
+- `after` (query): Cursor para avanzar a la siguiente página
 
 **Respuestas:**
 
-- **200 OK**: Lista de streams en vivo
+- **200 OK**: Lista de streams en vivo con paginación
 ```json
-[
-  {
-    "title": "Playing Overwatch 2",
-    "user_name": "xQc"
-  },
-  {
-    "title": "World of Warcraft - Mythic+",
-    "user_name": "Asmongold"
+{
+  "data": [
+    { "title": "Playing Overwatch 2", "user_name": "xQc" },
+    { "title": "World of Warcraft - Mythic+", "user_name": "Asmongold" }
+  ],
+  "pagination": {
+    "cursor": "eyJiI..."
   }
-]
+}
 ```
 
 - **401 Unauthorized**: Token de Twitch inválido o expirado
 ```json
 {
   "error": "Unauthorized. Twitch access token is invalid or has expired."
+}
+```
+
+- **429 Too Many Requests**: Límite de peticiones excedido
+```json
+{
+  "error": "Too many requests. Please try again later.",
+  "retry_after": 1674927600
 }
 ```
 
@@ -164,10 +161,14 @@ Obtiene una lista de streams en vivo actualmente en Twitch.
 
 **Ejemplo de uso:**
 ```bash
+# Sin parámetros (20 streams por defecto)
 curl http://localhost:3000/analytics/streams
+
+# Con paginación y límite personalizado
+curl "http://localhost:3000/analytics/streams?first=40&after=eyJiI..."
 ```
 
-## 🛠 Decisiones técnicas
+## Decisiones técnicas
 
 ### Arquitectura
 
@@ -175,7 +176,6 @@ curl http://localhost:3000/analytics/streams
 - **Routes**: Define los endpoints y vincula con controladores
 - **Controllers**: Gestiona la lógica de negocio y validaciones
 - **Services**: Encapsula la comunicación con APIs externas (Twitch)
-- **Middlewares**: (Preparado para autenticación/logging futuro)
 
 **Justificación:** Separación de responsabilidades facilita el mantenimiento, testing y escalabilidad.
 
@@ -186,139 +186,76 @@ curl http://localhost:3000/analytics/streams
 - Se almacena la fecha de expiración para renovación automática
 - No requiere base de datos ni almacenamiento externo
 
-**Justificación:** Para el alcance del reto, esta solución es simple y efectiva. Evita llamadas innecesarias al endpoint OAuth de Twitch.
-
-### Manejo de errores
-
-**Estrategia centralizada:**
-- Cada controlador captura errores específicos (401, 404)
-- Los errores inesperados caen en el catch general (500)
-- Mensajes de error exactos según especificación
-
-**Justificación:** Proporciona respuestas consistentes y predecibles al cliente.
+**Justificación:** Solución simple y efectiva, evita llamadas innecesarias al endpoint OAuth de Twitch.
 
 ### Validaciones
 
-**Validación del parámetro ID:**
-- Se valida presencia del parámetro antes de hacer request a Twitch
+**Endpoint `/analytics/user`:**
+- Valida presencia del parámetro `id` (cualquier string válido, Twitch trata IDs como opacos)
 - Respuesta 400 inmediata si falta
 
-**Justificación:** Reduce llamadas innecesarias a la API y mejora experiencia del usuario.
+**Endpoint `/analytics/streams`:**
+- Limita automáticamente `first` a máximo 100 (límite de Twitch API)
+- Soporta cursor `after` para paginación
 
-## ⚖️ Trade-offs y consideraciones
+**Justificación:** Reduce llamadas innecesarias y mejora experiencia del usuario.
 
-### 1. **Token en memoria vs Base de datos**
+### Manejo de errores
 
-**Decisión:** Token en memoria  
-**Pros:** Simple, rápido, sin dependencias adicionales  
-**Contras:** Se pierde al reiniciar el servidor (no es problema crítico, se regenera automáticamente)  
-**Alternativa considerada:** Redis/DB para persistencia - Descartado por complejidad innecesaria para el alcance del reto
+- Cada controlador captura errores específicos (401, 404, 429)
+- Los errores inesperados caen en el catch general (500)
+- Para 429 (rate limit), se devuelve el header `retry_after` de Twitch
 
-### 2. **Sin middleware de autenticación propio**
+**Justificación:** Respuestas consistentes y predecibles al cliente.
 
-**Decisión:** No implementar autenticación para consumir la API  
-**Justificación:** Las especificaciones no lo requieren. La autenticación OAuth es únicamente para Twitch.  
-**Nota:** El archivo `auth.middleware.js` queda preparado para implementarlo si fuera necesario en el futuro.
+### Paginación
 
-### 3. **Sin tests automatizados**
+- Soporta parámetros `first` y `after`
+- Devuelve estructura `{ data: [...], pagination: { cursor: "..." } }`
+- Compatible con el sistema de paginación de Twitch
 
-**Decisión:** Priorizar funcionalidad completa sobre tests  
-**Justificación:** Según las especificaciones, los happy paths y manejo de errores son prioritarios. Los tests quedarían como mejora futura.  
-**Testing realizado:** Manual con Postman/curl
+**Justificación:** Permite obtener más resultados sin sobrecargar la respuesta inicial.
 
-### 4. **Transformación de respuesta en `/streams`**
+### Rate Limits
 
-**Decisión:** Mapear solo los campos `title` y `user_name`  
-**Justificación:** Las especificaciones indican devolver únicamente estos campos, reduciendo payload innecesario.
+- Captura error 429 de Twitch
+- Devuelve el timestamp `retry_after` al cliente
+- El cliente es responsable de implementar retry con backoff
 
-### 5. **Sin paginación en `/streams`**
+**Justificación:** Mantiene la API simple y sin estado.
 
-**Decisión:** Devolver el resultado directo de Twitch (por defecto 20 streams)  
-**Justificación:** No especificado en el reto. La API de Twitch ya limita la respuesta.  
-**Mejora futura:** Implementar parámetros `limit` y `cursor` para paginación.
+## Trade-offs y consideraciones
 
-## 📁 Estructura del proyecto
+### Token en memoria vs Base de datos
 
-```
-RuthAltamirano_540/
-├── src/
-│   ├── app.js                      # Configuración de Express
-│   ├── controllers/
-│   │   └── analytics.controller.js # Lógica de endpoints
-│   ├── routes/
-│   │   └── analytics.routes.js     # Definición de rutas
-│   ├── services/
-│   │   └── twitch.service.js       # Comunicación con Twitch API
-│   ├── middlewares/
-│   │   ├── auth.middleware.js      # (Preparado para futuro)
-│   │   └── error.middleware.js     # (Preparado para futuro)
-│   └── tests/
-│       └── analytics.test.js       # (Preparado para futuro)
-├── server.js                       # Punto de entrada
-├── .env                            # Variables de entorno (no versionado)
-├── .gitignore
-├── package.json
-└── README.md
-```
+- **Token en memoria**: simple y rápido, se pierde al reiniciar el servidor
+- Persistencia en DB descartada por complejidad innecesaria
 
-## 🔮 Posibles mejoras
+### Sin middleware de autenticación propio
 
-### A corto plazo
-- [ ] Tests unitarios con Jest/Mocha
-- [ ] Tests de integración para endpoints
-- [ ] Validación más robusta de IDs (formato numérico)
-- [ ] Logging estructurado con Winston/Morgan
-- [ ] Rate limiting para proteger la API
+- La API no requiere autenticación para consumirla, solo OAuth hacia Twitch
 
-### A mediano plazo
-- [ ] Paginación en `/streams`
-- [ ] Filtros adicionales (por juego, idioma)
-- [ ] Caché de respuestas con TTL
-- [ ] Documentación con Swagger/OpenAPI
-- [ ] Healthcheck endpoint
+### Transformación de respuesta en `/streams`
 
-### A largo plazo
-- [ ] Autenticación de usuarios de la API
-- [ ] Métricas y monitoreo (Prometheus)
-- [ ] Despliegue en contenedores (Docker)
-- [ ] CI/CD con GitHub Actions
+- Solo se devuelven `title` y `user_name` junto con `pagination`
 
-## 🤔 Dudas e hipótesis
+### Paginación básica
 
-### Hipótesis asumidas:
+- Soporte de `first` y `after` sin validación exhaustiva, Twitch valida internamente
 
-1. **Formato de ID:** Asumí que el ID de usuario es cualquier string. Twitch usa IDs numéricos, pero no se especificó validación de formato.
+### Rate Limits delegados al cliente
 
-2. **Campos del usuario:** Devolví todos los campos que retorna Twitch. Las especificaciones mencionan "campos exactamente definidos" pero no los lista. En un entorno real, consultaría con el equipo qué campos específicos se necesitan.
+- Se devuelve 429 con `retry_after`, sin retry automático
 
-3. **Límite de streams:** El endpoint `/streams` retorna 20 streams por defecto (límite de Twitch). No se especificó si se requiere paginación o un límite diferente.
+## Posibles mejoras
 
-4. **Manejo de token expirado:** Implementé renovación automática antes de cada request. Otra opción sería renovar solo cuando falle un request (retry pattern).
+- [ ] Validar que `first` sea un número positivo
+- [ ] Añadir validación de formato para cursor `after`
+- [ ] Rate limiting interno para proteger la API
+- [ ] Variables de entorno para configurar límites
 
-### Preguntas para el equipo:
+## Notas finales
 
-- ¿Se requiere autenticación para consumir esta API?
-- ¿Hay límites de rate limiting que debamos implementar?
-- ¿Los campos del usuario deben ser todos o solo algunos específicos?
-- ¿Se necesita soporte para paginación en streams?
-- ¿Qué estrategia de caché prefieren para producción?
+**Tiempo de desarrollo:** ~7 horas
 
-## 👤 Autor
-
-**Ruth Altamirano**  
-Reto técnico para 540 - Enero 2026
-
----
-
-## 📝 Notas finales
-
-Este proyecto fue desarrollado siguiendo las prioridades funcionales especificadas:
-
-1. ✅ Happy paths funcionando (200)
-2. ✅ Gestión de tokens (401)
-3. ✅ Casos límite (404)
-4. ✅ Validaciones y errores (400, 500)
-
-**Tiempo de desarrollo:** ~6 horas
-
-La implementación está lista para revisión y discusión técnica. Estoy abierta a feedback y mejoras sugeridas por el equipo.
+Soporta paginación con cursor `after` y devuelve `retry_after` en caso de alcanzar rate limits de Twitch.
