@@ -218,3 +218,8 @@ según especificación
 - [ ] Rate limiting interno para proteger la API
 - [ ] Variables de entorno para configurar límites
 La implementación cumple con todas las especificaciones del reto técnico, priorizando la funcionalidad core según lo requerido
+
+## Nota sobre el archivo .env
+
+El archivo `.env` está incluido en el repositorio únicamente para facilitar la evaluación del reto técnico, 
+ya que las credenciales proporcionadas son públicas y de prueba. 
