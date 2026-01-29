@@ -19,7 +19,7 @@ Este proyecto implementa una API que interactúa con la API pública de Twitch p
 - Consultar información de usuarios por ID
 - Listar streams en directo actualmente
 
-La API gestiona automáticamente la autenticación OAuth con Twitch, maneja errores según las especificaciones y soporta paginación y límites de rate limit.
+La API gestiona automáticamente la autenticación OAuth con Twitch, maneja errores según las especificaciones y devuelve respuestas bien estructuradas.
 
 ## Requisitos previos
 
@@ -183,16 +183,18 @@ curl http://localhost:3000/analytics/streams
 
 **Justificación:** Respuestas consistentes y predecibles al cliente.
 
-### Validación de parámetros
+### Enfoque minimalista en `/analytics/streams`
 
-**Decisión:** No validar exhaustivamente `first` ni `after`
+**Decisión:** No implementar paginación
 
-**Justificación:** Twitch API valida internamente estos parámetros:
-- `first`: Twitch limita automáticamente valores fuera de rango (1-100)
-- `after`: Twitch valida el cursor y devuelve datos vacíos si es inválido
-- El servidor delega estas validaciones a Twitch para evitar lógica redundante
+**Investigación realizada:** Se estudió cómo Twitch soporta paginación basada en cursor:
+- Parámetro `first`: especificar cantidad de items por página (1-100)
+- Parámetro `after`: cursor para obtener la página siguiente
+- Respuesta con `pagination.cursor` para navegar a la siguiente página
 
-**Resultado:** Código más limpio, confía en validaciones upstream de Twitch.
+**Por qué no se implementó:** Las especificaciones del reto piden devolver un array simple `[{title, user_name}]` sin parámetros de paginación. Para mantener conformidad exacta con los requisitos, se decidió priorizar la especificación sobre características adicionales.
+
+**Resultado:** Código simple, directo y que cumple 100% con especificaciones. La paginación está documentada como mejora futura si se requiere en el futuro.
 
 ### Rate Limits
 
@@ -204,9 +206,7 @@ curl http://localhost:3000/analytics/streams
 **Nuestra implementación:**
 - Propagamos el error 429 al cliente
 - El cliente implementa retry con backoff
-- No implementamos rate limiting interno (out of scope)
-- Los errores inesperados caen en el catch general (500)
-- Mensajes de error exactos según especificación
+- No implementamos rate limiting interno (out of scope para el reto)
 
 ## Trade-offs y consideraciones
 
@@ -227,6 +227,20 @@ curl http://localhost:3000/analytics/streams
 ### Rate Limits delegados al cliente
 
 - Se devuelve 429 con `retry_after`, sin retry automático
+
+## Pruebas
+
+### Ejecutar tests
+
+```bash
+npm test
+```
+
+Los tests validan:
+- ✅ Endpoint `/user` con ID válido → 200
+- ✅ Endpoint `/user` sin ID → 400
+- ✅ Endpoint `/user` con usuario no existente → 404
+- ✅ Endpoint `/streams` con token válido → 200
 
 ## Posibles mejoras
 
